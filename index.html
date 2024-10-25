@@ -74,14 +74,29 @@
     </section>
 
     <section id="Hardware">
-        <h2>iCreate3 Robot Desc</h2>
+        <h2>iCreate3 Robot Description</h2>
         <img src="irobot_create3.jpg" alt="Project Screenshot" style="max-width:100%; height:auto;">
-        <p>[Project description text]</p>
+        <p>The iRobot Create3 is a programmable robot designed for research and educational 
+            purposes, providing a platform for exploring robotics concepts. The robot is compatible 
+            with ROS 2 (Robot Operating System) and can connect to wifi and Low Energy Bluetooth. 
+            iRobot also hosts several important librarys that are available on Github, providing important functions for operating the robot.
+            Here’s a summary of its key sensors:</p>
+        <ul>
+            <li>4 x Cliff Sensors (IR)</li>
+            <li>7 x Infrared Sensors</li>
+            <li>2 x Bumper Sensors</li>
+            <li>Optical Wheel Encoders (wheel speed & distance traveled)</li>
+            <li>Charging Contacts & Docking Sensor</li>
+        </ul>
  </section>
     <!-- Bayesian Network Description -->
     <section id="bayesian-network">
         <h2>Bayesian Network Description</h2>
-        <p>The Bayesian Network comprises key variables representing the robot's proximity to the wall, door passage status, and sensor readings. The CPTs are learned from the data obtained during the robot's movement and provide probabilistic estimates for each variable’s state.</p>
+        <p>The Bayesian Network comprises key variables representing its sensor readings, 
+            distance to the wall, and whether a door was passed. 
+            The CPTs are learned from the data obtained during multiple tests where all 
+            variables (observable and unobservable) are recorded and provide probabilistic 
+            estimates for each variable’s state.</p>
     </section>
 
     <!-- Source Code Links Section -->
@@ -107,7 +122,7 @@
 
     <!-- Footer -->
     <footer>
-        <p>© [Your Name], [Year]. Sensor Fusion Project for Bayesian Network-based Decision Making.</p>
+        <p>© Elliott, 2024. Sensor Fusion Project for Bayesian Network-based Decision Making.</p>
     </footer>
 
 </body>
