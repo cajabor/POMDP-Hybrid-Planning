@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Fusion Project - Bayesian Network</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        header {
+            background-color: #333;
+            color: #fff;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        section {
+            padding: 1.5rem;
+            margin: 1rem;
+            background-color: #fff;
+            border-radius: 8px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        a {
+            color: #1e90ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: #333;
+            color: #fff;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <p>Sensor Fusion Project</p>
+        <p>Based on a Bayesian Network for Wall-Following Robot</p>
+    </header>
+
+    <!-- Team Description Section -->
+    <section id="team">
+        <h2>Team Description</h2>
+        <p>[Created by: Jolie Elliott, Samuel Boddepalli, and CJ Ajabor]</p>
+    </section>
+
+
+
+    <!-- Project Description Section -->
+    <section id="project-description">
+        <h2>Project Description</h2>
+        <p>This project involves developing a sensor fusion module for a robot that uses a Bayesian Network to decide:</p>
+        <ul>
+            <li>Whether it has just passed by a door (10cm ago)</li>
+            <li>Its actual distance from the wall as a probability distribution</li>
+        </ul>
+        <p>The robot uses its onboard sensors for continuous data collection while moving along a wall. The Bayesian Network processes this sensor data to 
+            make real-time decisions based on a set of Conditional Probability Tables (CPTs) learned from measurements collected by the robot.</p>
+    </section>
+
+    <section id="Hardware">
+        <h2>iCreate3 Robot Desc</h2>
+        <img src="irobot_create3.jpg" alt="Project Screenshot" style="max-width:100%; height:auto;">
+        <p>[Project description text]</p>
+ </section>
+    <!-- Bayesian Network Description -->
+    <section id="bayesian-network">
+        <h2>Bayesian Network Description</h2>
+        <p>The Bayesian Network comprises key variables representing the robot's proximity to the wall, door passage status, and sensor readings. The CPTs are learned from the data obtained during the robot's movement and provide probabilistic estimates for each variable’s state.</p>
+    </section>
+
+    <!-- Source Code Links Section -->
+    <section id="source-code">
+        <h2>Source Code Downloads</h2>
+        <ul>
+            <li><a href="[URL-to-measurement-source-code]" target="_blank">Download source code to take measurements with the robot</a></li>
+            <li><a href="[URL-to-CPT-computation-source-code]" target="_blank">Download source code to compute CPTs from sensor readings</a></li>
+            <li><a href="[URL-to-sensor-fusion-source-code]" target="_blank">Download source code to compute sensor fusion and generate belief map</a></li>
+        </ul>
+    </section>
+
+    <!-- Final CPTs and Downloadable Files Section -->
+    <section id="final-cpts">
+        <h2>Final CPTs and Downloadable Files</h2>
+        <p>The final CPTs used in the Bayesian Network are based on data from various robot experiments and represent the conditional probabilities for each state. These CPT values are available in multiple formats for review:</p>
+        <ul>
+            <li><a href="[URL-to-CPT-csv-file]" target="_blank">Download CPT values in CSV format</a></li>
+            <li><a href="[URL-to-CPT-word-file]" target="_blank">Download CPT values in Word format</a></li>
+            <li><a href="[URL-to-CPT-html-file]" target="_blank">View CPT values in HTML format</a></li>
+        </ul>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>© [Your Name], [Year]. Sensor Fusion Project for Bayesian Network-based Decision Making.</p>
+    </footer>
+
+</body>
+</html>

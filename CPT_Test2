@@ -1,0 +1,121 @@
+# Written by Jolie Elliott
+# For the Create3 Irobot
+
+# Purpose: To follow the wall smoothly and avoid collisions. If collision occurs, use the same reverse parameters.
+
+import asyncio
+from irobot_edu_sdk.backend.bluetooth import Bluetooth
+from irobot_edu_sdk.robots import event, Robot, Create3
+from irobot_edu_sdk.music import Note
+
+# Establish connection with a specific robot
+robot = Create3(Bluetooth('iRobot-030F9BF3B40449DC94031C'))
+speed = 10
+maxSpeed = 15
+minSpeed = 1
+
+# PID parameters (adjusted for smoother control)
+kp = 0.4  # Reduced to make adjustments less aggressive
+ki = 0.02  # Small integral factor for gradual correction
+kd = 0.1   # Small derivative to counteract rapid changes
+
+# Desired distance to the wall and threshold for front obstacles
+wallDistance = 8.5
+collisionDistance = 500
+previousError = 0
+integral = 0
+dt = 0.1  # Time delta for PID calculation
+
+# Initialize global speed variables
+speedL = speed
+speedR = speed
+
+# Movement Functions
+async def forward():
+    global speedL, speedR
+    await robot.set_lights_on_rgb(0, 255, 0)
+    await robot.set_wheel_speeds(speedL, speedR)
+
+async def backoff():
+    await robot.set_lights_on_rgb(255, 80, 0)
+    await robot.move(-10)        # Reverse 10 cm
+    await robot.turn_left(45)    # Turn left 45 degrees
+
+def front_obstacle(sensors):
+    """Check if there's an obstacle in front."""
+    return sensors[3] > collisionDistance
+
+def current_distance(d1, d2):
+    """Calculate current distance to the wall using averaged sensor data."""
+    ir = (d1 + d2) / 2  # Average the readings from d1 and d2 for stability
+    A = 2000
+    B = -150
+    d = (ir - A) / B
+    return d
+
+def pid_distance(d1, d2):
+    """Calculate the correction needed using PID control."""
+    global integral, previousError
+    d = current_distance(d1, d2)
+    error = d - wallDistance
+    integral += error * dt
+    derivative = (error - previousError) / dt
+    correction = kp * error + ki * integral + kd * derivative
+
+    # Cap correction to prevent drastic adjustments
+    correction = max(min(correction, 5), -5)
+    previousError = error
+    print('Correction:', correction)
+    return correction
+
+@event(robot.when_bumped, [True, True])
+async def avoidcollision(robot):
+    """Handle collision by backing off and resuming wall-following."""
+    print('Collision detected! Executing backoff.')
+    await backoff()
+    await forward()
+
+@event(robot.when_play)
+async def play(robot):
+    """Main function to control the robot's behavior."""
+    print('Please place robot near a wall.')
+    await robot.set_lights_on_rgb(255, 0, 255)
+    await asyncio.sleep(1)
+    await robot.set_lights_on_rgb(255, 255, 0)
+    await asyncio.sleep(1)
+    await robot.play_note(Note.C4, 1)
+    await robot.set_lights_on_rgb(0, 255, 0)
+    print('Starting smooth wall-following.')
+
+    global speedL, speedR
+    speedL = speed
+    speedR = speed
+
+    await forward()
+    
+    while True:
+        sensors = (await robot.get_ir_proximity()).sensors
+        if front_obstacle(sensors):  # Avoid front obstacle
+            print('Obstacle detected.')
+            await backoff()
+            await forward()
+            continue  # Skip to next iteration after backoff
+
+        # Average multiple sensor readings for stability
+        d1 = sensors[6]
+        await asyncio.sleep(0.05)
+        sensors = (await robot.get_ir_proximity()).sensors
+        d2 = sensors[6]
+        print(f'(d1, d2): ({d1}, {d2})')
+
+        # Calculate correction with PID
+        correction = pid_distance(d1, d2)
+        speedL = max(min(speed + correction, maxSpeed), minSpeed)
+        speedR = max(min(speed - correction, maxSpeed), minSpeed)
+        print(f"SpeedL: {speedL}, SpeedR: {speedR}")
+
+        # Move forward with adjusted speeds
+        await forward()
+        await asyncio.sleep(0.1)
+
+robot.play()
