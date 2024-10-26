@@ -1,9 +1,3 @@
-# Written by Jolie Elliott
-# For the Create3 iRobot
-
-# Purpose: To follow the wall smoothly, avoid collisions, identify door frames, and realign after exiting a door frame.
-# Records data to a CSV file and allows pausing and resuming with the 'r' key.
-
 import asyncio
 import csv
 import time
@@ -11,11 +5,11 @@ import threading
 from irobot_edu_sdk.backend.bluetooth import Bluetooth
 from irobot_edu_sdk.robots import event, Robot, Create3
 from irobot_edu_sdk.music import Note
-from pynput import keyboard  # Ensure pynput is installed: pip install pynput
+from pynput import keyboard
 
-# Establish connection with a specific robot
+# Robot initialization
 robot = Create3(Bluetooth('iRobot-030F9BF3B40449DC94031C'))
-speed = 10
+speed = 5
 maxSpeed = 15
 minSpeed = 1
 
@@ -23,74 +17,93 @@ minSpeed = 1
 kp = 0.4
 ki = 0.02
 kd = 0.1
-
-# Desired distance to the wall and threshold for front obstacles
 wallDistance = 8.5
 collisionDistance = 500
 previousError = 0
 integral = 0
-dt = 0.1  # Time delta for PID calculation
+dt = 0.1
 
-# Initialize global variables
+# Global variables
 speedL = speed
 speedR = speed
 is_paused = False
+bumper_triggered = False
+# States: 'Wall Following', 'In Door Frame', 'Exiting Door Frame', 'Realigning to Wall', 'Wall Following Post-Exit'
+state = 'Wall Following'
+door_frame_start_time = None
+last_door_detection_time = None
 
-# Simplified States
-state = 'Wall Following'  # Possible states: 'Wall Following', 'In Door Frame', 'Exiting Door Frame', 'Realigning to Wall', 'Wall Following Post-Exit'
-
-# Position tracking
-position = {"x": 0, "y": 0, "orientation": 0}  # x, y in cm; orientation in degrees
-
-# CSV file setup
-csv_file = open('robot_data.csv', 'w', newline='')
+# Enhanced CSV file setup with door detection
+csv_file = open('robot_sensor_data.csv', 'w', newline='')
 csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Time', 'State', 'SpeedL', 'SpeedR', 'd1', 'd2', 'Correction'])
+csv_writer.writerow(['Bumper_Triggered', 'Current_Distance', 'Door_Passed'])
 
-# Movement Functions
+
 async def forward():
     global speedL, speedR
     await robot.set_wheel_speeds(speedL, speedR)
 
 async def backoff():
     await robot.set_lights_on_rgb(255, 80, 0)  # Orange for backoff
-    await robot.move(-10)        # Reverse 10 cm
-    await robot.turn_left(45)    # Turn left 45 degrees
+    await robot.move(-10)        
+    await robot.turn_left(45)    
 
 async def path_out():
-    """Path out of the door frame by turning right 90 degrees."""
-    await robot.set_lights_on_rgb(0, 0, 255)  # Blue during path out
-    await robot.turn_right(90)  # Adjust the angle as needed
-    print("Executing path out of the door frame.")
-
-def front_obstacle(sensors):
-    """Check if there's an obstacle in front."""
-    return sensors[3] > collisionDistance
+    """Path out of the door frame"""
+    await robot.set_lights_on_rgb(0, 0, 255)  
+    await robot.turn_right(90)  
+    print("Executing path out of door frame.")
 
 def current_distance(d1, d2):
-    """Calculate current distance to the wall using averaged sensor data."""
-    ir = (d1 + d2) / 2  # Average the readings from d1 and d2 for stability
+    """Calculate current distance to wall"""
+    ir = (d1 + d2) / 2
     A = 2000
     B = -150
     d = (ir - A) / B
     return d
 
 def pid_distance(d1, d2):
-    """Calculate the correction needed using PID control."""
+    """Calculate PID correction"""
     global integral, previousError
     d = current_distance(d1, d2)
     error = d - wallDistance
     integral += error * dt
     derivative = (error - previousError) / dt
     correction = kp * error + ki * integral + kd * derivative
-
-    # Cap correction to prevent drastic adjustments
     correction = max(min(correction, 5), -5)
     previousError = error
-    return correction
+    return correction, d
+
+def check_door_frame(d1, d2, correction):
+    """Check if robot is passing through a door frame"""
+    global state, door_frame_start_time, last_door_detection_time
+    current_time = time.time()
+    
+    # Door frame detection conditions
+    distance = current_distance(d1, d2)
+    is_door_frame = correction > 3.0 and distance > (wallDistance + 5)
+    
+    if state == 'Wall Following' and is_door_frame:
+        state = 'In Door Frame'
+        door_frame_start_time = current_time
+        last_door_detection_time = current_time
+        print("Door frame detected! State changed to: In Door Frame")
+        return True
+    
+    elif state == 'In Door Frame':
+        if not is_door_frame:
+            state = 'Exiting Door Frame'
+            print("Exiting door frame")
+            
+    elif state == 'Exiting Door Frame':
+        if current_time - door_frame_start_time > 2.0:  # 2 seconds timeout
+            state = 'Realigning to Wall'
+            print("Realigning to wall")
+            
+    return False
 
 def set_lights():
-    """Set robot lights based on current state."""
+    """Set robot lights based on current state"""
     async def _set_lights():
         if state == 'Wall Following':
             await robot.set_lights_on_rgb(255, 165, 0)  # Orange
@@ -99,147 +112,134 @@ def set_lights():
         elif state == 'Exiting Door Frame':
             await robot.set_lights_on_rgb(0, 0, 255)    # Blue
         elif state == 'Realigning to Wall':
-            await robot.set_lights_on_rgb(128, 0, 128)  # Purple for realignment
+            await robot.set_lights_on_rgb(128, 0, 128)  # Purple
         elif state == 'Wall Following Post-Exit':
-            await robot.set_lights_on_rgb(255, 255, 0)  # Yellow for resuming wall-following
+            await robot.set_lights_on_rgb(255, 255, 0)  # Yellow
     asyncio.create_task(_set_lights())
 
-def write_data(timestamp, d1, d2, correction):
-    """Write data to the CSV file."""
-    csv_writer.writerow([timestamp, state, speedL, speedR, d1, d2, correction])
-
-def on_press(key):
-    """Handle key press events."""
-    global is_paused
-    try:
-        if key.char == 'r':
-            is_paused = not is_paused
-            if is_paused:
-                print('Robot paused. Press "r" to resume.')
-            else:
-                print('Robot resumed.')
-    except AttributeError:
-        pass  # Ignore special keys
-
-def start_key_listener():
-    """Start the keyboard listener in a separate thread."""
-    listener = keyboard.Listener(on_press=on_press)
-    listener.start()
+def write_sensor_data(timestamp, d1, d2, correction, curr_distance, door_detected=False):
+    """Write enhanced sensor data with door detection to CSV"""
+    time_since_last_door = 0
+    if last_door_detection_time is not None:
+        time_since_last_door = timestamp - last_door_detection_time
+        
+    csv_writer.writerow([
+        #timestamp,
+        #state,
+        bumper_triggered,
+        round(curr_distance, 2),
+        #d1,
+        #d2,
+        #round(correction, 2),
+        #round(speedL, 2),
+        #round(speedR, 2),
+        door_detected#,
+        #round(time_since_last_door, 2)
+    ])
 
 @event(robot.when_bumped, [True, True])
-async def avoidcollision(robot_event):
-    """Handle collision by backing off and transitioning states appropriately."""
-    global state
-
+async def handle_collision(robot_event):
+    """Handle collision events"""
+    global bumper_triggered, state
+    bumper_triggered = True
+    
+    print('Collision detected!')
+    await robot.set_lights_on_rgb(255, 0, 0)  # Red for collision
+    
     if state == 'In Door Frame':
-        print('Collision detected while in Door Frame! Executing backoff and marking as Exiting Door Frame.')
+        print('Collision in Door Frame! Executing recovery...')
+        await robot.move(-20)
+        await robot.turn_left(-45)
+        await robot.move(20)
         await backoff()
         await path_out()
         state = 'Realigning to Wall'
-        set_lights()
     else:
-        print('Collision detected! Executing backoff.')
+        await robot.move(-20)
+        await robot.turn_left(-45)
+        await robot.move(20)
         await backoff()
-        await forward()
+    
+    # Record collision event
+    timestamp = time.time()
+    sensors = (await robot.get_ir_proximity()).sensors
+    d1, d2 = sensors[6], sensors[6]
+    correction, curr_distance = pid_distance(d1, d2)
+    write_sensor_data(timestamp, d1, d2, correction, curr_distance)
+    
+    await asyncio.sleep(1)
+    bumper_triggered = False
+    set_lights()
 
 @event(robot.when_play)
 async def play(robot_event):
-    """Main function to control the robot's behavior."""
-    print('Please place robot near a wall.')
-    await robot.set_lights_on_rgb(255, 0, 255)  # Initial Magenta
-    await asyncio.sleep(1)
-    await robot.set_lights_on_rgb(255, 255, 0)  # Yellow
-    await asyncio.sleep(1)
-    await robot.play_note(Note.C4, 1)
-    await robot.set_lights_on_rgb(255, 165, 0)    # Yellow for wall-following
-    print('Starting smooth wall-following.')
-
+    """Main control loop with door detection"""
     global speedL, speedR, is_paused, state
-    speedL = speed
-    speedR = speed
-
-    await forward()
     
-    # Start the keyboard listener
-    threading.Thread(target=start_key_listener, daemon=True).start()
-
+    print('Starting wall following with door detection...')
+    set_lights()
+    
     while True:
-        await asyncio.sleep(0.05)  # Main loop delay
-
+        await asyncio.sleep(dt)
+        
         if is_paused:
             await robot.set_wheel_speeds(0, 0)
-            await robot.set_lights_on_rgb(255, 255, 255)  # White light when paused
-            continue  # Skip the rest of the loop if paused
-
-        sensors = (await robot.get_ir_proximity()).sensors
-
-        if front_obstacle(sensors):  # Avoid front obstacle
-            print('Front obstacle detected. Executing backoff.')
-            await backoff()
-            await forward()
-            continue  # Skip to next iteration after backoff
-
+            continue
+            
         # Get sensor readings
+        sensors = (await robot.get_ir_proximity()).sensors
         d1 = sensors[6]
         await asyncio.sleep(0.05)
         sensors = (await robot.get_ir_proximity()).sensors
         d2 = sensors[6]
-        timestamp = time.time()
-        print(f'[{timestamp}] (d1, d2): ({d1}, {d2})')
-
-        # Calculate correction with PID
-        correction = pid_distance(d1, d2)
         
-        # State transitions based on correction
-        if state == 'Wall Following' and correction > 3.0:
-            state = 'In Door Frame'
-            set_lights()
-            print("State changed to: In Door Frame")
+        # Calculate PID correction and current distance
+        correction, curr_distance = pid_distance(d1, d2)
         
-        elif state == 'Realigning to Wall':
-            # Rotate slowly right to find wall again
-            await robot.turn_right(10)  # Turn right by 10 degrees incrementally
+        # Check for door frame
+        door_detected = check_door_frame(d1, d2, correction)
+        
+        # State-based behavior
+        if state == 'Realigning to Wall':
+            await robot.turn_right(10)
             await asyncio.sleep(0.2)
-            
-            # Check if the robot has found the wall within desired distance
             if current_distance(d1, d2) <= wallDistance + 2:
                 state = 'Wall Following Post-Exit'
                 set_lights()
-                print("State changed to: Wall Following Post-Exit")
-
-        elif state == 'Wall Following Post-Exit':
-            # Continue with normal wall following behavior
+        
+        elif state in ['Wall Following', 'Wall Following Post-Exit']:
             speedL = max(min(speed + correction, maxSpeed), minSpeed)
             speedR = max(min(speed - correction, maxSpeed), minSpeed)
             await forward()
-            print("Resuming normal wall-following behavior.")
+        
+        # Record data
+        timestamp = time.time()
+        write_sensor_data(timestamp, d1, d2, correction, curr_distance, door_detected)
+        
+        # Print status
+        print(f'Time: {timestamp:.2f}, State: {state}, Distance: {curr_distance:.2f}cm, Correction: {correction:.2f}')
 
-        # Write data to CSV
-        write_data(timestamp, d1, d2, correction)
+def on_press(key):
+    """Handle keyboard events"""
+    global is_paused
+    try:
+        if key.char == 'r':
+            is_paused = not is_paused
+            print('Robot ' + ('paused' if is_paused else 'resumed'))
+    except AttributeError:
+        pass
 
-        # Move forward based on PID correction
-        if state == 'Wall Following' or state == 'In Door Frame':
-            speedL = max(min(speed + correction, maxSpeed), minSpeed)
-            speedR = max(min(speed - correction, maxSpeed), minSpeed)
-            await forward()
-
-async def get_robot_position():
-    """
-    Placeholder function to get the robot's current position.
-    Implement this based on your SDK's capabilities.
-    """
-    if not hasattr(get_robot_position, "position"):
-        get_robot_position.position = {"x": 0, "y": 0, "orientation": 0}
-
-    get_robot_position.position['x'] += speed * dt * 0.1  # Assuming speed is cm/s
-    return get_robot_position.position
-
-# Close the CSV file gracefully when the program exits
-def close_csv_file():
+def cleanup():
+    """Cleanup function"""
     csv_file.close()
+    print("Data collection completed. CSV file closed.")
 
-# Register the CSV file close function to be called on exit
+# Setup keyboard listener and cleanup
+keyboard_listener = keyboard.Listener(on_press=on_press)
+keyboard_listener.start()
 import atexit
-atexit.register(close_csv_file)
+atexit.register(cleanup)
 
+# Start the robot
 robot.play()
+
