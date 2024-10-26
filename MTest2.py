@@ -1,8 +1,8 @@
 # Written by Jolie Elliott
 # For the Create3 iRobot
 
-# Purpose: To follow the wall smoothly, avoid collisions, and identify door frames using a belief network.
-# It records data to a CSV file and allows pausing and resuming with the 'r' key.
+# Purpose: To follow the wall smoothly, avoid collisions, identify door frames, and realign after exiting a door frame.
+# Records data to a CSV file and allows pausing and resuming with the 'r' key.
 
 import asyncio
 import csv
@@ -11,7 +11,7 @@ import threading
 from irobot_edu_sdk.backend.bluetooth import Bluetooth
 from irobot_edu_sdk.robots import event, Robot, Create3
 from irobot_edu_sdk.music import Note
-from pynput import keyboard  # Make sure to install pynput for keyboard listening
+from pynput import keyboard  # Ensure pynput is installed: pip install pynput
 
 # Establish connection with a specific robot
 robot = Create3(Bluetooth('iRobot-030F9BF3B40449DC94031C'))
@@ -25,7 +25,7 @@ ki = 0.02
 kd = 0.1
 
 # Desired distance to the wall and threshold for front obstacles
-wallDistance = 5
+wallDistance = 8.5
 collisionDistance = 500
 previousError = 0
 integral = 0
@@ -37,12 +37,10 @@ speedR = speed
 is_paused = False
 
 # Simplified States
-state = 'Wall Following'  # Possible states: 'Wall Following', 'In Door Frame', 'Exiting Door Frame', 'Passed Door Frame'
+state = 'Wall Following'  # Possible states: 'Wall Following', 'In Door Frame', 'Exiting Door Frame', 'Realigning to Wall', 'Wall Following Post-Exit'
 
-# Variables to track exiting door frame
-exiting_start_position = None
-exiting_traveled_distance = 0
-required_exiting_distance = 30  # cm to consider door frame passed
+# Position tracking
+position = {"x": 0, "y": 0, "orientation": 0}  # x, y in cm; orientation in degrees
 
 # CSV file setup
 csv_file = open('robot_data.csv', 'w', newline='')
@@ -91,17 +89,6 @@ def pid_distance(d1, d2):
     previousError = error
     return correction
 
-def belief_network(correction):
-    """Simplified belief network to determine the robot's state."""
-    global state
-
-    if state == 'Wall Following':
-        if correction > 4.0 and wallDistance > 10:
-            state = 'In Door Frame'
-            print("State changed to: In Door Frame")
-            set_lights()
-    # No transition based on correction in other states
-
 def set_lights():
     """Set robot lights based on current state."""
     async def _set_lights():
@@ -139,17 +126,10 @@ def start_key_listener():
     listener = keyboard.Listener(on_press=on_press)
     listener.start()
 
-def calculate_distance(last_pos, current_pos):
-    """Calculate the Euclidean distance between two positions."""
-    dx = current_pos['x'] - last_pos['x']
-    dy = current_pos['y'] - last_pos['y']
-    distance = (dx**2 + dy**2) ** 0.5
-    return distance
-
 @event(robot.when_bumped, [True, True])
 async def avoidcollision(robot_event):
     """Handle collision by backing off and transitioning states appropriately."""
-    global state, exiting_start_position, exiting_traveled_distance
+    global state
 
     if state == 'In Door Frame':
         print('Collision detected while in Door Frame! Executing backoff and marking as Exiting Door Frame.')
@@ -171,10 +151,10 @@ async def play(robot_event):
     await robot.set_lights_on_rgb(255, 255, 0)  # Yellow
     await asyncio.sleep(1)
     await robot.play_note(Note.C4, 1)
-    await robot.set_lights_on_rgb(0, 255, 0)    # Green
+    await robot.set_lights_on_rgb(255, 165, 0)    # Yellow for wall-following
     print('Starting smooth wall-following.')
 
-    global speedL, speedR, is_paused, state, exiting_start_position, exiting_traveled_distance
+    global speedL, speedR, is_paused, state
     speedL = speed
     speedR = speed
 
@@ -183,7 +163,6 @@ async def play(robot_event):
     # Start the keyboard listener
     threading.Thread(target=start_key_listener, daemon=True).start()
 
-    last_position = await get_robot_position()  # Implement this based on your SDK
     while True:
         await asyncio.sleep(0.05)  # Main loop delay
 
@@ -195,7 +174,7 @@ async def play(robot_event):
         sensors = (await robot.get_ir_proximity()).sensors
 
         if front_obstacle(sensors):  # Avoid front obstacle
-            print('Front obstacle detected.')
+            print('Front obstacle detected. Executing backoff.')
             await backoff()
             await forward()
             continue  # Skip to next iteration after backoff
@@ -211,16 +190,8 @@ async def play(robot_event):
         # Calculate correction with PID
         correction = pid_distance(d1, d2)
         
-        # Update state based on correction
-        belief_network(correction)  # Update state based on correction
-        
-        print(f"State: {state}, SpeedL: {speedL}, SpeedR: {speedR}, Correction: {correction}")
-
-        # Write data to CSV
-        write_data(timestamp, d1, d2, correction)
-
-         # State transitions based on correction
-        if state == 'Wall Following' and correction > 4.0:
+        # State transitions based on correction
+        if state == 'Wall Following' and correction > 3.0:
             state = 'In Door Frame'
             set_lights()
             print("State changed to: In Door Frame")
@@ -257,21 +228,10 @@ async def get_robot_position():
     Placeholder function to get the robot's current position.
     Implement this based on your SDK's capabilities.
     """
-    # Example implementation (replace with actual position retrieval)
-    # Assuming the SDK provides a method to get the robot's position
-    # Here, we'll return a dummy position that increments over time
-    # Replace this with actual position data from the robot
-    # For the purpose of this example, let's assume the robot moves straight
-    # and we can estimate the position based on time and speed
-
-    # Initialize position on first call
     if not hasattr(get_robot_position, "position"):
         get_robot_position.position = {"x": 0, "y": 0, "orientation": 0}
 
-    # Update position based on current wheel speeds and time
-    # This is a simplistic estimation and should be replaced with actual sensor data
     get_robot_position.position['x'] += speed * dt * 0.1  # Assuming speed is cm/s
-    # y and orientation can be updated similarly if needed
     return get_robot_position.position
 
 # Close the CSV file gracefully when the program exits

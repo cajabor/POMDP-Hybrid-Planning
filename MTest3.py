@@ -2,12 +2,13 @@
 # For the Create3 iRobot
 
 # Purpose: To follow the wall smoothly, avoid collisions, and identify door frames using a belief network.
-# It records data to a CSV file and allows pausing and resuming with the 'r' key.
+# It records data to a CSV file that is continuously updated and allows pausing and resuming with the 'r' key.
 
 import asyncio
 import csv
 import time
 import threading
+from collections import deque
 from irobot_edu_sdk.backend.bluetooth import Bluetooth
 from irobot_edu_sdk.robots import event, Robot, Create3
 from irobot_edu_sdk.music import Note
@@ -44,10 +45,14 @@ exiting_start_position = None
 exiting_traveled_distance = 0
 required_exiting_distance = 30  # cm to consider door frame passed
 
+# Time tracking for switching back to wall-following mode after 5 seconds
+post_exit_start_time = None
+post_exit_duration = 5  # 5 seconds required to switch back to "Wall Following"
+
 # CSV file setup
-csv_file = open('robot_data.csv', 'w', newline='')
+csv_file = open('robot_data.csv', 'a', newline='')
 csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Time', 'State', 'SpeedL', 'SpeedR', 'd1', 'd2', 'Correction'])
+csv_writer.writerow(['State', 'Time', 'SpeedL', 'SpeedR', 'd1', 'd2', 'Correction'])
 
 # Movement Functions
 async def forward():
@@ -93,14 +98,15 @@ def pid_distance(d1, d2):
 
 def belief_network(correction):
     """Simplified belief network to determine the robot's state."""
-    global state
+    global state, post_exit_start_time
 
-    if state == 'Wall Following':
-        if correction > 4.0 and wallDistance > 10:
-            state = 'In Door Frame'
-            print("State changed to: In Door Frame")
-            set_lights()
-    # No transition based on correction in other states
+    if state == 'Wall Following' and correction > 4.5:
+        state = 'In Door Frame'
+        print("State changed to: In Door Frame")
+        set_lights()
+    elif state == 'Exiting Door Frame' and post_exit_start_time is None:
+        # Start timer after exiting door frame
+        post_exit_start_time = time.time()
 
 def set_lights():
     """Set robot lights based on current state."""
@@ -111,15 +117,46 @@ def set_lights():
             await robot.set_lights_on_rgb(255, 0, 255)  # Magenta
         elif state == 'Exiting Door Frame':
             await robot.set_lights_on_rgb(0, 0, 255)    # Blue
-        elif state == 'Realigning to Wall':
-            await robot.set_lights_on_rgb(128, 0, 128)  # Purple for realignment
-        elif state == 'Wall Following Post-Exit':
-            await robot.set_lights_on_rgb(255, 255, 0)  # Yellow for resuming wall-following
+        elif state == 'Passed Door Frame':
+            await robot.set_lights_on_rgb(0, 255, 0)    # Green
     asyncio.create_task(_set_lights())
 
 def write_data(timestamp, d1, d2, correction):
     """Write data to the CSV file."""
-    csv_writer.writerow([timestamp, state, speedL, speedR, d1, d2, correction])
+    csv_writer.writerow([state, timestamp, speedL, speedR, d1, d2, correction])
+
+def check_wall_following_reentry():
+    """Check if the robot should return to wall-following after 5 seconds."""
+    global state, post_exit_start_time
+    if state == 'Exiting Door Frame' and post_exit_start_time is not None:
+        if time.time() - post_exit_start_time >= post_exit_duration:
+            state = 'Wall Following'
+            post_exit_start_time = None  # Reset timer
+            print("State changed back to: Wall Following")
+            set_lights()
+
+def calculate_weighted_likelihood(target_state):
+    """Calculate the weighted likelihood based on recent CSV data."""
+    recent_states = deque(maxlen=50)  # Analyze the last 50 entries
+
+    with open('robot_data.csv', 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            if row[0] != 'State':  # Skip the header row
+                recent_states.append(row[0])
+
+    if not recent_states:
+        return 0  # If no data, return 0% likelihood
+
+    # Apply weights based on recency
+    total_weight = sum(range(1, len(recent_states) + 1))
+    weighted_occurrences = sum(
+        (i + 1) for i, state in enumerate(recent_states) if state == target_state
+    )
+
+    # Calculate weighted likelihood as a percentage
+    likelihood = int((weighted_occurrences / total_weight) * 100)
+    return likelihood
 
 def on_press(key):
     """Handle key press events."""
@@ -139,23 +176,16 @@ def start_key_listener():
     listener = keyboard.Listener(on_press=on_press)
     listener.start()
 
-def calculate_distance(last_pos, current_pos):
-    """Calculate the Euclidean distance between two positions."""
-    dx = current_pos['x'] - last_pos['x']
-    dy = current_pos['y'] - last_pos['y']
-    distance = (dx**2 + dy**2) ** 0.5
-    return distance
-
 @event(robot.when_bumped, [True, True])
 async def avoidcollision(robot_event):
     """Handle collision by backing off and transitioning states appropriately."""
-    global state, exiting_start_position, exiting_traveled_distance
+    global state
 
     if state == 'In Door Frame':
         print('Collision detected while in Door Frame! Executing backoff and marking as Exiting Door Frame.')
         await backoff()
         await path_out()
-        state = 'Realigning to Wall'
+        state = 'Exiting Door Frame'
         set_lights()
     else:
         print('Collision detected! Executing backoff.')
@@ -171,19 +201,18 @@ async def play(robot_event):
     await robot.set_lights_on_rgb(255, 255, 0)  # Yellow
     await asyncio.sleep(1)
     await robot.play_note(Note.C4, 1)
-    await robot.set_lights_on_rgb(0, 255, 0)    # Green
+    await robot.set_lights_on_rgb(255, 165, 0)  # Orange for wall-following
     print('Starting smooth wall-following.')
 
-    global speedL, speedR, is_paused, state, exiting_start_position, exiting_traveled_distance
+    global speedL, speedR, is_paused, state
     speedL = speed
     speedR = speed
 
     await forward()
-    
+
     # Start the keyboard listener
     threading.Thread(target=start_key_listener, daemon=True).start()
 
-    last_position = await get_robot_position()  # Implement this based on your SDK
     while True:
         await asyncio.sleep(0.05)  # Main loop delay
 
@@ -206,72 +235,37 @@ async def play(robot_event):
         sensors = (await robot.get_ir_proximity()).sensors
         d2 = sensors[6]
         timestamp = time.time()
-        print(f'[{timestamp}] (d1, d2): ({d1}, {d2})')
 
         # Calculate correction with PID
         correction = pid_distance(d1, d2)
         
-        # Update state based on correction
-        belief_network(correction)  # Update state based on correction
-        
-        print(f"State: {state}, SpeedL: {speedL}, SpeedR: {speedR}, Correction: {correction}")
+        # Update state and belief network based on correction
+        belief_network(correction)
+
+        # Check if enough time has passed to revert to wall following
+        check_wall_following_reentry()
 
         # Write data to CSV
         write_data(timestamp, d1, d2, correction)
 
-         # State transitions based on correction
-        if state == 'Wall Following' and correction > 4.0:
-            state = 'In Door Frame'
-            set_lights()
-            print("State changed to: In Door Frame")
-        
-        elif state == 'Realigning to Wall':
-            # Rotate slowly right to find wall again
-            await robot.turn_right(10)  # Turn right by 10 degrees incrementally
-            await asyncio.sleep(0.2)
-            
-            # Check if the robot has found the wall within desired distance
-            if current_distance(d1, d2) <= wallDistance + 2:
-                state = 'Wall Following Post-Exit'
-                set_lights()
-                print("State changed to: Wall Following Post-Exit")
-
-        elif state == 'Wall Following Post-Exit':
-            # Continue with normal wall following behavior
-            speedL = max(min(speed + correction, maxSpeed), minSpeed)
-            speedR = max(min(speed - correction, maxSpeed), minSpeed)
-            await forward()
-            print("Resuming normal wall-following behavior.")
-
-        # Write data to CSV
-        write_data(timestamp, d1, d2, correction)
+        # Print state with weighted likelihood
+        likelihood = calculate_weighted_likelihood(state)
+        print(f"Current State: {state}, Likelihood: {likelihood}%")
 
         # Move forward based on PID correction
-        if state == 'Wall Following' or state == 'In Door Frame':
-            speedL = max(min(speed + correction, maxSpeed), minSpeed)
-            speedR = max(min(speed - correction, maxSpeed), minSpeed)
-            await forward()
+        speedL = max(min(speed + correction, maxSpeed), minSpeed)
+        speedR = max(min(speed - correction, maxSpeed), minSpeed)
+        await forward()
 
 async def get_robot_position():
     """
     Placeholder function to get the robot's current position.
     Implement this based on your SDK's capabilities.
     """
-    # Example implementation (replace with actual position retrieval)
-    # Assuming the SDK provides a method to get the robot's position
-    # Here, we'll return a dummy position that increments over time
-    # Replace this with actual position data from the robot
-    # For the purpose of this example, let's assume the robot moves straight
-    # and we can estimate the position based on time and speed
-
-    # Initialize position on first call
     if not hasattr(get_robot_position, "position"):
         get_robot_position.position = {"x": 0, "y": 0, "orientation": 0}
 
-    # Update position based on current wheel speeds and time
-    # This is a simplistic estimation and should be replaced with actual sensor data
     get_robot_position.position['x'] += speed * dt * 0.1  # Assuming speed is cm/s
-    # y and orientation can be updated similarly if needed
     return get_robot_position.position
 
 # Close the CSV file gracefully when the program exits
