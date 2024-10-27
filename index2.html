@@ -35,19 +35,6 @@
         a:hover {
             text-decoration: underline;
         }
-        table {
-            width: 60%;
-            margin: 20px auto;
-            border-collapse: collapse;
-        }
-        th,td {
-            border: 1px solid #333;
-            padding: 10px;
-            text-align: center;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
         footer {
             text-align: center;
             padding: 1rem;
@@ -63,13 +50,13 @@
 
     <header>
         <p>Sensor Fusion Project</p>
-        <p>Bayesian Network for Wall-Following Robot</p>
+        <p>Based on a Bayesian Network for Wall-Following Robot</p>
     </header>
 
     <!-- Team Description Section -->
     <section id="team">
         <h2>Team Description</h2>
-        <p>Created by: Jolie Elliott, Samuel Boddepalli, and CJ Ajabor</p>
+        <p>[Created by: Jolie Elliott, Samuel Boddepalli, and CJ Ajabor]</p>
     </section>
 
 
@@ -86,56 +73,36 @@
             make real-time decisions based on a set of Conditional Probability Tables (CPTs) learned from measurements collected by the robot.</p>
     </section>
 
-    <section id="hardware">
+    <section id="Hardware">
         <h2>iCreate3 Robot Description</h2>
         <img src="irobot_create3.jpg" alt="Project Screenshot" style="max-width:100%; height:auto;">
         <p>The iRobot Create3 is a programmable robot designed for research and educational 
             purposes, providing a platform for exploring robotics concepts. The robot is compatible 
-            with ROS 2 (Robot Operating System) and can connect to Wifi or Low-Energy Bluetooth. 
-            iRobot also hosts several important libraries that are available on Github, providing important functions for operating the robot.
+            with ROS 2 (Robot Operating System) and can connect to wifi and Low Energy Bluetooth. 
+            iRobot also hosts several important librarys that are available on Github, providing important functions for operating the robot.
             Here’s a summary of its key sensors:</p>
         <ul>
-            <li>7 x Infrared Sensors (IR)</li>
             <li>4 x Cliff Sensors (IR)</li>
+            <li>7 x Infrared Sensors</li>
             <li>2 x Bumper Sensors</li>
             <li>Optical Wheel Encoders (wheel speed & distance traveled)</li>
             <li>Charging Contacts & Docking Sensor</li>
         </ul>
-    </section>
-
+ </section>
     <!-- Bayesian Network Description -->
     <section id="bayesian-network">
         <h2>Bayesian Network Description</h2>
-        <img src="BeliefNetworkDiagram.jpg" alt="Project Screenshot" style="max-width:100%; height:auto;">
         <p>The Bayesian Network comprises key variables representing its sensor readings, 
-            distance to the wall, its current state, and whether a door was passed. 
+            distance to the wall, and whether a door was passed. 
             The CPTs are learned from the data obtained during multiple tests where all 
             variables (observable and unobservable) are recorded and provide probabilistic 
             estimates for each variable’s state.</p>
-        <h3> Variables</h3>
-        <ul>
-            <li>Door Passed [True, False]: Whether or not a door was passed 10 cm ago</li>
-            <li>RobotState: Indicates which state the robot is in</li>
-                <ul>
-                    <li>Wall Following</li>
-                    <li>Entering Door Frame</li>
-                    <li>Exiting Door Frame</li>
-                </ul>
-            <li>Wall Distance [Close, Moderate, Far]: Indicates approximate ditance between robot and a wall to its right.</li>
-            <li>Bump [True, False]: Indicates whether a bump or collision occurred</li>
-            <li>IR Sensor [Low, Medium, High]: Indicates reflectometer reading from right-hand side of robot. Lighter-coloered objects will be registered better than dark.</li>
-        </ul>
     </section>
 
     <!-- Source Code Links Section -->
     <section id="source-code">
-        <h2>Source Code  & Dependencies</h2>
-        <p> This code was written using VSCode. Originally, the Web Developement website was 
-            employed to connect to the robot and upload code remotely, but debugging is limited on the website. 
-            To be able to run this code, Visual Studio and Microsoft C++ Build Tools must be installed, as well as python (linked below).</p>
+        <h2>Source Code Downloads</h2>
         <ul>
-            <li>Download the latest version of <a href="https://www.python.org/downloads/" target="_blank">Python</a></li>
-            <li>Download iRobot library <a href="https://github.com/iRobotEducation/irobot-edu-python-sdk" target="_blank">irobot_edu_python_sdk</a></li>
             <li><a href="https://github.com/scubajolie/CSE5694_Project1/blob/master/MTest2.py" target="_blank">Download source code to take measurements with the robot</a></li>
             <li><a href="https://github.com/scubajolie/CSE5694_Project1/blob/master/final_probability.py" target="_blank">Download source code to compute CPTs from sensor readings</a></li>
             <li><a href="https://github.com/scubajolie/CSE5694_Project1/blob/master/MTest2.py" target="_blank">Download source code to compute sensor fusion and generate belief map</a></li>
@@ -175,15 +142,9 @@
         </table>
     </section>
 
-    <section id="thanks">
-        <h2>Thank You For Your Attention!</h2>
-        <p> "Programming is 10% writing code and 90% Wondering why it isn't working" </p>
-        
-    </section>
-
     <!-- Footer -->
     <footer>
-        <p>© CSE5694, 2024. Sensor Fusion Project for Bayesian Network-based Decision Making.</p>
+        <p>© Elliott, 2024. Sensor Fusion Project for Bayesian Network-based Decision Making.</p>
     </footer>
 
 </body>
