@@ -76,7 +76,7 @@
 
     <!-- Project Description Section -->
     <section id="project-description">
-        <h2>Project Description</h2>
+        <h2>Project 1 Description</h2>
         <p>This project involves developing a sensor fusion module for a robot that uses a Bayesian Network to decide:</p>
         <ul>
             <li>Whether it has just passed by a door (10cm ago)</li>
@@ -84,6 +84,10 @@
         </ul>
         <p>The robot uses its onboard sensors for continuous data collection while moving along a wall. The Bayesian Network processes this sensor data to 
             make real-time decisions based on a set of Conditional Probability Tables (CPTs) learned from measurements collected by the robot.</p>
+
+        <h2>Project 2 Description</h2>
+        <p>As a continuation, Project 2 requires the robot to execute a plan/policy where it counts 3 "doors" on the right and stops at the 3rd (e.g., accepting a cargo), before returning to start.</p>
+        
     </section>
 
     <section id="hardware">
@@ -104,22 +108,26 @@
     </section>
 
     <!-- Bayesian Network Description -->
-    <section id="bayesian-network">
-        <h2>Bayesian Network Description</h2>
-        <img src="BeliefNetworkDiagram.jpg" alt="Project Screenshot" style="max-width:100%; height:auto;">
-        <p>The Bayesian Network comprises key variables representing its sensor readings, 
-            distance to the wall, its current state, and whether a door was passed. 
+    <section id="Dynamic-Bayesian Network">
+        <h2>Dynamic Bayesian Network Description</h2>
+        <img src="Project2_HMM_Diagram.jpg" alt="Project Screenshot" style="max-width:100%; height:auto;">
+        <p>The Sensor Fusion Network comprises key variables to interpret its sensor readings as a 
+            distance to the wall. The Hidden Markov Model uses this interpreted sonar reading to determine whether
+            or not a door was passed by generating a belief of the robot's current state. 
+            The color of the power button indicates what the robot believes its current state is.
+            Once the color transitions from "door passed" to "wall following" the door counter is incremented by 1.
             The CPTs are learned from the data obtained during multiple tests where all 
             variables (observable and unobservable) are recorded and provide probabilistic 
             estimates for each variable’s state.</p>
         <h3> Variables</h3>
         <ul>
-            <li>Door Passed [True, False]: Whether or not a door was passed 10 cm ago</li>
             <li>RobotState: Indicates which state the robot is in</li>
                 <ul>
-                    <li>Wall Following</li>
-                    <li>Entering Door Frame</li>
-                    <li>Exiting Door Frame</li>
+                    <li>Wall Following (green) </li>
+                    <li>Possible Door Frame (yellow)</li>
+                    <li>In Door Frame (magenta)</li>
+                    <li>Passed Door Frame (blue)</li>
+                    <li>Return Home (red)</li>
                 </ul>
             <li>Wall Distance [Close, Moderate, Far]: Indicates approximate ditance between robot and a wall to its right.</li>
             <li>Bump [True, False]: Indicates whether a bump or collision occurred</li>
@@ -130,21 +138,41 @@
     <!-- Source Code Links Section -->
     <section id="source-code">
         <h2>Source Code  & Dependencies</h2>
-        <p> This code was written using VSCode. Originally, the Web Developement website was 
-            employed to connect to the robot and upload code remotely, but debugging is limited on the website. 
-            To be able to run this code, Visual Studio and Microsoft C++ Build Tools must be installed, as well as python (linked below).</p>
+        <p> This code was written using VSCode. To be able to run this code, Visual Studio and Microsoft C++ Build Tools must be installed
+             as well as python (linked below). On VS Code, run the command:
+        <ul>
+             <li> pip install irobot</li>
+             <li> pip3 install irobot_edu_sdk</li>
+             <li> python -m venv irobot_env (Create Virtual enironment)</li>
+             <li> ....After env is created run python scripts under the directory "Scripts"</li>
+        </ul>
+        </p>
+
+        <h2>Dependencies</h2>
         <ul>
             <li>Download the latest version of <a href="https://www.python.org/downloads/" target="_blank">Python</a></li>
             <li>Download iRobot library <a href="https://github.com/iRobotEducation/irobot-edu-python-sdk" target="_blank">irobot_edu_python_sdk</a></li>
+        </ul>
+        <h2>Project 1 Source Code</h2>
+        <ul>
             <li><a href="https://github.com/scubajolie/CSE5694_Project1/blob/master/MTest2.py" target="_blank">Download source code to take measurements with the robot</a></li>
             <li><a href="https://github.com/scubajolie/CSE5694_Project1/blob/master/final_probability.py" target="_blank">Download source code to compute CPTs from sensor readings</a></li>
             <li><a href="https://github.com/scubajolie/CSE5694_Project1/blob/master/MTest2.py" target="_blank">Download source code to compute sensor fusion and generate belief map</a></li>
+        </ul>
+        <h2>Project 2 Source Code</h2>
+        <ul>
+            <li><a href="https://github.com/scubajolie/CSE5694_Project1/tree/master/BeliefNetwork_WithTrace" target="_blank">Directory to download source code</a></li>
+            <ul>
+                <li> WallFollowing.py: Main execution code containing functions and events related to robot control</li>
+                <li> trace_ui.py: Recieves position and distance data which is used to approximate the robots path and the relative position of the wall</li>
+                <li> belief_network.py:  Determines the current robot state using the HMM as described above.</li>
+           </ul>
         </ul>
     </section>
 
     <!-- Final CPTs and Downloadable Files Section -->
     <section id="final-cpts">
-        <h2>Final CPTs and Downloadable Files</h2>
+        <h2>Project 1 CPTs and Downloadable Files</h2>
         <p>The final CPTs used in the Bayesian Network are based on data from various robot experiments and represent the conditional probabilities for each state. These CPT values are available for review:</p>
         <p>The final CPTs used in the Bayesian Network are based on data from various robot experiments and represent the conditional probabilities for each state. These CPT values are available for review:</p>
         <ul>
@@ -174,6 +202,74 @@
                 <td>0.15</td>
             </tr>
 
+        </table>
+
+        <h2>Project 2 HMM CPTS</h2>
+        <p>The model for project 2 requires 2 CPT tables: a Transition Probability Table, and a Sensor Probability Table.</p>
+        <h3>Transition Probability Model</h3>
+        <table>
+            <tr>
+                <th>RobotState</th>
+                <th>P(Wall Following)</th>
+                <th>P(Possible Door Frame)</th>
+                <th>P(Door Passed)</th>
+                
+            </tr>
+            <tr>
+                <td>Wall Following</td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+                
+            </tr>
+            <tr>
+                <td>Possible Door Frame</td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+                
+            </tr>
+            <tr>
+                <td>Door Passed</td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+                
+            </tr>
+
+
+        </table>
+
+        <h3>Sensor Probability Model</h3>
+        <table>
+            <tr>
+                <th>IRSensor</th>
+                <th>P(Wall Following)</th>
+                <th>P(Possible Door Frame)</th>
+                <th>P(Door Passed)</th>
+            </tr>
+            <tr>
+                <td>Low</td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+
+            </tr>
+            <tr>
+                <td>Moderate</td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+
+            </tr>
+            <tr>
+                <td>High</td>
+                <td> </td>
+                <td> </td>
+                <td> </td>
+
+            </tr>
+            
         </table>
     </section>
 
