@@ -14,6 +14,7 @@ import math
 
 
 
+#from belief_network_jollie import update_belief_state  # Import the belief network function
 from belief_network import update_belief_state  # Import the belief network function
 
 
@@ -25,7 +26,7 @@ HOST = '127.0.0.1'  # Localhost for testing; replace with actual IP if needed
 PORT = 65432  # Port number for UI to listen to
 
 # Start Trace_ui Process
-trace_ui_process = subprocess.Popen(['python', 'irobot_env/Scripts/TestsFolder/BeliefNetowork/trace_ui.py'])
+trace_ui_process = subprocess.Popen(['python', 'C:/Users/AssistLab/Downloads/trace_ui.py'])
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -38,12 +39,12 @@ wallDistance = 6
 collisionDistance = 500
 minTurnDistance = 7
 sharpTurnDistance = 4
-maxSpeed = 15
+maxSpeed = 21
 minSpeed = 1
-forwardSpeed = 10
+forwardSpeed = 5
 TURN_SPEED = 5
-previousError = 0
-integral = 0
+previousError = 0.1
+integral = 0.1
 dt = 0.1
 speedL = forwardSpeed
 speedR = forwardSpeed
@@ -133,19 +134,30 @@ async def forward():
         await robot.set_lights_on_rgb(0, 255, 0)
     await robot.set_wheel_speeds(speedL, speedR)
 
-async def backoff():
+async def backoff_left():
     await robot.set_lights_on_rgb(255, 80, 0)
     await robot.move(-10)
-    await robot.turn_left(45)
+    await robot.turn_left(20)
+
+async def backoff_right():
+    await robot.set_lights_on_rgb(255, 80, 0)
+    await robot.move(-10)
+    await robot.turn_left(20)
 
 def front_obstacle(sensors):
     front_distance = min(approximate_distance(sensors[3]), approximate_distance(sensors[4]))
     return front_distance
 
+@event(robot.when_bumped, [False, True])
+async def avoidcollision(robot):
+    print('Right Bumper Collision detected! Executing backoff.')
+    await backoff_right()
+    await forward()
+
 @event(robot.when_bumped, [True, True])
 async def avoidcollision(robot):
-    print('Collision detected! Executing backoff.')
-    await backoff()
+    print('Left Bumper Collision detected! Executing backoff.')
+    await backoff_left()
     await forward()
 
 def smoothed_wall_position(x, y, d_wall, smoothed_heading):
@@ -202,39 +214,41 @@ async def return_to_start():
         starting_x, starting_y, [], 
         stop_robot=stop_robot, 
         return_to_start=return_to_start, 
-        door_count_goal=1,  # Set your desired door count goal
+        door_count_goal=3,  # Set your desired door count goal
         override_state="return_to_home"
     )
     if color:
         await set_led_color(color)
 
     # Navigate to the starting position
-    await robot.navigate_to(starting_x, starting_y)
+    await robot.navigate_to(starting_x-50, starting_y)
+    
 
     # Continuously check if the robot has reached the start location
-    while returning_to_start:
-        position = await robot.get_position()
-        if position:
-            # Check if the robot is within a very close threshold of the starting point
-            if abs(position.x - starting_x) <= 0.1 and abs(position.y - starting_y) <= 0.1:
-                await stop_robot()  # Stop the robot when it reaches the start
-                await set_led_color("red")  # Set LED to red to indicate it has returned home
-                print("Robot returned to starting position and stopped with red LED.")
-                returning_to_start = False  # Reset the return flag
-                break
-        await asyncio.sleep(0.1)  # Check position periodically
+    # while returning_to_start:
+    #     position = await robot.get_position()
+    #     if position:
+    #         # Check if the robot is within a very close threshold of the starting point
+    #         if abs(position.x - starting_x) <= 0.1 and abs(position.y - starting_y) <= 0.1:
+    #             await stop_robot()  # Stop the robot when it reaches the start
+    #             await set_led_color("red")  # Set LED to red to indicate it has returned home
+    #             print("Robot returned to starting position and stopped with red LED.")
+    #             returning_to_start = False  # Reset the return flag
+    #             break
+    #     await asyncio.sleep(0.1)  # Check position periodically
 
 
-        # Call update_belief_state with dummy positions to handle state and LED updates if needed
-        await update_belief_state(
-            robot_x=starting_x, 
-            robot_y=starting_y, 
-            sensor_distances=[], 
-            stop_robot=stop_robot, 
-            return_to_start=return_to_start,
-            last_position=(starting_x, starting_y), 
-            current_position=(position.x, position.y) if position else (starting_x, starting_y)
-        )
+    #     # Call update_belief_state with dummy positions to handle state and LED updates if needed
+    #     await update_belief_state(
+    #         robot_x=starting_x, 
+    #         robot_y=starting_y, 
+    #         sensor_distances=[], 
+    #         stop_robot=stop_robot, 
+    #         return_to_start=return_to_start,
+    #         last_position=(starting_x, starting_y), 
+    #         current_position=(position.x, position.y) if position else (starting_x, starting_y)
+    #     )
+    #await robot.turn_left(180)
 
 # Function to stop the robot in place
 async def stop_robot():
@@ -350,20 +364,31 @@ async def play(robot):
                     continue
 
                 d1 = distances[6]
+                
                 await asyncio.sleep(0.05)
                 sensors = (await robot.get_ir_proximity()).sensors
                 d2 = approximate_distance(sensors[6])
-
-                correction = pid_distance(d1, d2)
-                speedL = max(min(forwardSpeed + correction, maxSpeed), minSpeed)
-                speedR = max(min(forwardSpeed - correction, maxSpeed), minSpeed)
+                
+                # Check the difference between d2 and d1 to detect gaps or doors
+                if d2 - d1 > 11:  # Likely approaching a door or gap in the wall
+                    print("Gap detected, moving forward without PID correction.")
+                    # Move forward without correction
+                    # await robot.navigate_to(0, y + 12)
+                    speedL = forwardSpeed
+                    speedR = forwardSpeed
+                else:
+                    # Wall is still present, use PID correction
+                    correction = pid_distance(d1, d2)
+                    speedL = max(min(forwardSpeed + correction, maxSpeed), minSpeed)
+                    speedR = max(min(forwardSpeed - correction, maxSpeed), minSpeed)
 
                 # Pass observation_sequence to update_belief_state
                 new_color = await update_belief_state(
                     x, y, distances,
                     stop_robot=stop_robot,
                     return_to_start=return_to_start,
-                    door_count_goal= 1
+                    door_count_goal= 3 
+
                 )
 
 
