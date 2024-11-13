@@ -1,20 +1,23 @@
 import math
+import random
 import time
 import asyncio
 import csv
 import os
+import numpy as np
 
 # State variables
 state = "wall_following"  # Initial state
 previous_heading = None
 door_start_heading = None
 recent_positions = []
+door_states = [False]       #Assuming the first state is when were not in a door
 distance_travelled_in_frame = 0  # Track distance traveled since potential frame detection
 distance_travelled_after_door = 0  # Track distance traveled after passing door frame
 doors_passed = 0  # Count of doors passed
 
 # Thresholds
-distance_increase_threshold = 8  # Increase for possible door frame start
+distance_increase_threshold = 8 # Increase for possible door frame start
 distance_decrease_threshold = 6  # Decrease to detect the other side of a door frame
 angle_tolerance = 0.1  # Tolerance for heading change to verify original path
 distance_travel_threshold = 5  # Distance threshold to confirm door frame detection
@@ -35,6 +38,11 @@ async def update_belief_state(robot_x, robot_y, sensor_distances, stop_robot, re
             print(f"Override State Activated: {state}")
             await stop_robot()  # Call stop_robot function immediately
             return "red"
+        
+    if state == "possible_door_frame":
+        door_states.append(True)        #keep track of the times were in a door or not
+    else:
+        door_states.append(False)
 
     # Track recent positions to calculate heading
     recent_positions.append((robot_x, robot_y))
@@ -50,14 +58,36 @@ async def update_belief_state(robot_x, robot_y, sensor_distances, stop_robot, re
         # State machine for door frame detection and actions
         if state == "wall_following":
             # Green: Follows the wall
-            if sensor_distances[6] > distance_increase_threshold:
+            #
+            print(f"Last 10 Door states: {door_states[-80:]}")
+            if any(door_states[-80:]):  #looking into the last 10 entries to equal 30cm maybe? to see if any is true(there was a door)
+                probability_DD = 0.3     #(probability of door is 0.3 a door was recently seen)
+            else:
+                probability_DD = 0.7
+            if sensor_distances[6] > distance_increase_threshold: 
+                probability_D_dist = 0.9 #probability of door is 0.9 if significant distance increase is detected
+            else:
+                probability_D_dist = 0.2 #else with no distance increase, door probability is 0.2
+            
+            #probability of door given previous doors and evidence
+            probability_D_evidence = probability_DD * probability_D_dist
+
+            #Here we can say if probability_D_evidence is above a threshhold, then proceed to update the state.
+            #or we can generate a random number and if it is less than the probability then proceed.
+
+            #2nd option:
+            rand_num = random.random()
+            print(f"Probability of evidence of a door is {probability_D_evidence}")
+            if sensor_distances[6] > distance_increase_threshold: 
+            #if rand_num <= probability_D_evidence:
+                print(f"probabilities align to say we are in door frame")
                 state = "possible_door_frame"
                 previous_heading = heading
-                distance_travelled_in_frame = 0  # Reset distance tracker
+                distance_travelled_in_frame = 0  # Reset distance tracker 
                 print("Transition to Possible Door Frame")
                 return "yellow"
 
-            # Default color for wall following
+                # Default color for wall following
             return "green"
 
         elif state == "possible_door_frame":
@@ -90,7 +120,7 @@ async def update_belief_state(robot_x, robot_y, sensor_distances, stop_robot, re
             # Blue: After passing door frame, resumes wall-following for 30 cm
             distance_travelled_after_door += math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
             if distance_travelled_after_door >= distance_after_door_threshold:
-                if doors_passed >= door_count_goal:
+                if doors_passed >=door_count_goal:
                     state = "stop_and_return_home"  # Trigger return if goal is reached
                     print("Door count goal reached. Preparing to return home.")
                 else:
