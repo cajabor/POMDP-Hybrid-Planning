@@ -26,7 +26,7 @@ HOST = '127.0.0.1'  # Localhost for testing; replace with actual IP if needed
 PORT = 65432  # Port number for UI to listen to
 
 # Start Trace_ui Process
-trace_ui_process = subprocess.Popen(['python', 'C:/Users/AssistLab/Downloads/trace_ui.py'])
+trace_ui_process = subprocess.Popen(['python', 'C:irobot_env/Scripts/TestsFolder/BeliefNetowork/trace_ui.py'])
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
