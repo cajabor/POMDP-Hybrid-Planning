@@ -26,7 +26,7 @@ HOST = '127.0.0.1'  # Localhost for testing; replace with actual IP if needed
 PORT = 65432  # Port number for UI to listen to
 
 # Start Trace_ui Process
-trace_ui_process = subprocess.Popen(['python', 'C:/Users/scuba/Documents/CSE_5694/CSE5694_Project1/irobot_env/Scripts/Project3_withTrace/trace_ui.py'])
+trace_ui_process = subprocess.Popen(['python', 'trace_ui.py'])
 
 # Create a UDP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -34,7 +34,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # PID parameters and other settings
 kp = 0.4
 ki = 0.02
-kd = 0.1
+kd = 0.1 
 wallDistance = 6
 collisionDistance = 500
 minTurnDistance = 7
@@ -222,7 +222,8 @@ async def return_to_start():
         await set_led_color(color)
 
     # Navigate to the starting position
-    await robot.navigate_to(starting_x-50, starting_y)
+    await robot.navigate_to(starting_x-30, starting_y)
+    #await robot.turn_left(200)
     
 
     # Continuously check if the robot has reached the start location
@@ -372,17 +373,17 @@ async def play(robot):
                 d2 = approximate_distance(sensors[6])
                 
                 # Check the difference between d2 and d1 to detect gaps or doors
-                # if d2 - d1 > 11:  # Likely approaching a door or gap in the wall
-                #     print("Gap detected, moving forward without PID correction.")
-                #     # Move forward without correction
-                #     # await robot.navigate_to(0, y + 12)
-                #     speedL = forwardSpeed
-                #     speedR = forwardSpeed
-                # else:
+                if d2 - d1 > 11:  # Likely approaching a door or gap in the wall
+                    print("Gap detected, moving forward without PID correction.")
+                    # Move forward without correction
+                    # await robot.navigate_to(0, y + 12)
+                    speedL = forwardSpeed
+                    speedR = forwardSpeed
+                else:
                 # Wall is still present, use PID correction
-                correction = pid_distance(d1, d2)
-                speedL = max(min(forwardSpeed + correction, maxSpeed), minSpeed)
-                speedR = max(min(forwardSpeed - correction, maxSpeed), minSpeed)
+                    correction = pid_distance(d1, d2)
+                    speedL = max(min(forwardSpeed + correction, maxSpeed), minSpeed)
+                    speedR = max(min(forwardSpeed - correction, maxSpeed), minSpeed)
                 if run_time >= 1.5:  # Wait for PID to correct orientation before updating belief
                     # Pass observation_sequence to update_belief_state
                     new_color = await update_belief_state(
