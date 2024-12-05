@@ -63,9 +63,9 @@ async def update_belief_state(robot_x, robot_y, sensor_distances, stop_robot, re
             #
             print(f"Last 10 Door states: {door_states[-80:]}")
             if any(door_states[-80:]):  #looking into the last 10 entries to equal 30cm maybe? to see if any is true(there was a door)
-                probability_DD = 0.3     #(probability of door is 0.3 a door was recently seen)
+                probability_DD = 0.5     #(probability of door is 0.3 a door was recently seen)
             else:
-                probability_DD = 0.7
+                probability_DD = 0.8
             if sensor_distances[6] > distance_increase_threshold: 
                 probability_D_dist = 0.9 #probability of door is 0.9 if significant distance increase is detected
             else:
@@ -78,10 +78,9 @@ async def update_belief_state(robot_x, robot_y, sensor_distances, stop_robot, re
             #or we can generate a random number and if it is less than the probability then proceed.
 
             #2nd option:
-            rand_num = random.random()
             print(f"Probability of evidence of a door is {probability_D_evidence}")
-            if sensor_distances[6] > distance_increase_threshold: 
-            #if rand_num <= probability_D_evidence:
+            #if sensor_distances[6] > distance_increase_threshold: 
+            if probability_D_evidence >= 0.5:
                 print(f"probabilities align to say we are in door frame")
                 state = "possible_door_frame"
                 previous_heading = heading
@@ -120,14 +119,14 @@ async def update_belief_state(robot_x, robot_y, sensor_distances, stop_robot, re
             # perhaps couint distance as it is in frame as well
             total_door_width += math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 
-            if abs(current_heading - door_start_heading) < angle_tolerance:
+            if abs(current_heading - door_start_heading) < angle_tolerance and total_door_width >= 45:
                 state = "past_door_frame"
                 doors_passed += 1  # Increment door count
-                distance_travelled_after_door = 0  # Reset distance for post-door travel
+                distance_travelled_after_door = 0  #  Reset distance for post-door travel
                 print(f"Transition to Past Door Frame. Doors passed: {doors_passed}")
                 return "blue"
             
-            if total_door_width >= assumed_door_width:
+            if total_door_width >= assumed_door_width:  #total door width has passed the max width to be considered for a door
                 state = "wall_following"  
                 print("Took too long to establish door, continuing wall following")
                 return "green"
