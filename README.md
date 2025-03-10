@@ -1,6 +1,6 @@
 # 🚧Under construction🚧
 
-##Paper Submitted To Florida Artificial Intelligence Research Society
+## Paper Submitted To Florida Artificial Intelligence Research Society
 [FLAIRS Paper](https://github.com/cajabor/Broadcast-Distributed-System)
 
 Install Visual Studio 
